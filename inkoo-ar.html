@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تتو زنده روی بدن · INKOO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0D0D0D;--card:#181818;--text:#F5F5F0;--mute:#A3A3A3;--red:#E50914}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{touch-action:manipulation}
+  body{margin:0;background:#000;color:var(--text);font-family:Vazirmatn,Tahoma,sans-serif;height:100vh;height:100dvh;overflow:hidden;position:fixed;inset:0;width:100%}
+  header{position:fixed;top:0;right:0;z-index:20;padding:calc(8px + env(safe-area-inset-top)) 14px 8px;font-weight:700;font-size:14px;text-shadow:0 1px 4px #000;pointer-events:none}
+  header span{color:var(--red)}
+  #stageWrap{position:fixed;inset:0;background:#000;z-index:1}
+  canvas#cv{display:block;width:100%;height:100%;object-fit:cover;background:#111;touch-action:none}
+  canvas#cv.mirror{transform:scaleX(-1)}
+  #status{position:absolute;left:12px;right:12px;top:calc(44px + env(safe-area-inset-top));text-align:center;font-size:13px;color:var(--text);background:rgba(0,0,0,.55);border-radius:8px;padding:6px 10px;pointer-events:none}
+  #hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mute);text-align:center;padding:24px;font-size:14px;line-height:2;pointer-events:none}
+  #ui{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:0 10px calc(10px + env(safe-area-inset-bottom));pointer-events:none;display:flex;flex-direction:column;gap:8px}
+  #ui>*{pointer-events:auto}
+  #sheet{display:none;background:rgba(14,14,14,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:10px 12px;max-height:42vh;overflow-y:auto}
+  #sheet.open{display:block}
+  .dock{display:flex;gap:8px;align-items:center;justify-content:center}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .btn{flex:1;min-width:90px;background:rgba(20,20,20,.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--text);border:1px solid rgba(255,255,255,.18);border-radius:12px;min-height:44px;padding:10px 8px;font:inherit;font-size:13px;text-align:center;cursor:pointer}
+  .dock .btn{min-width:0}
+  .btn.primary{background:rgba(229,9,20,.85);border-color:var(--red);font-weight:700}
+  .btn.on{border-color:var(--red)}
+  .btn:disabled{opacity:.4}
+  #snapBtn{flex:none;width:64px;height:64px;min-height:64px;border-radius:50%;padding:0;font-size:12px;background:rgba(245,245,240,.9);color:#000;border:4px solid rgba(255,255,255,.5)}
+  #snapBtn:disabled{background:rgba(245,245,240,.35)}
+  label.ctl{display:block;font-size:12px;color:var(--text);margin-bottom:6px}
+  input[type=range]{height:32px;width:100%;accent-color:var(--red)}
+  input[type=file]{display:none}
+  .note{font-size:12px;color:#ccc;margin:0;line-height:1.8}
+  #toast{position:fixed;left:12px;right:12px;bottom:calc(96px + env(safe-area-inset-bottom));background:#222;border:1px solid var(--red);color:var(--text);padding:12px;border-radius:10px;font-size:13px;text-align:center;display:none;z-index:80}
+  #cropOv{position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px}
+  #cropCv{touch-action:none;border-radius:6px;background:#222}
+  #cropOv .row{width:100%;max-width:420px;margin:0}
+</style>
+</head>
+<body>
+<header>INK<span>OO</span> · تتو زنده روی بدن</header>
+
+<div id="stageWrap">
+  <canvas id="cv" width="640" height="480"></canvas>
+  <div id="hint">«شروع دوربین» را بزن و بعد طرح تتو را انتخاب کن.</div>
+  <div id="status" style="display:none"></div>
+</div>
+
+<div id="ui">
+  <div id="sheet">
+    <div class="row">
+      <button class="btn" id="cropBtn" disabled>برش طرح</button>
+      <button class="btn" id="blackBtn">سیاه و سفید</button>
+      <button class="btn" id="flipBtn">برعکس کردن</button>
+      <button class="btn" id="resetBtn">وسط‌چین</button>
+      <button class="btn" id="camBtn" disabled>تعویض دوربین</button>
+      <button class="btn" id="torchBtn" disabled>فلش</button>
+    </div>
+    <label class="ctl">غلظت جوهر<input id="sOp" type="range" min="20" max="100" value="85"></label>
+    <div class="note">با یک انگشت طرح را جابه‌جا کن؛ با دو انگشت بزرگ، کوچک و بچرخانش. طرح فقط روی پوست دیده می‌شود. عضو را وسط کادر و در نور خوب بگیر. تصویر دوربین جایی ارسال نمی‌شود.</div>
+  </div>
+  <div class="dock">
+    <label class="btn" for="tattooIn">طرح تتو</label>
+    <button class="btn primary" id="startBtn">شروع دوربین</button>
+    <button class="btn" id="snapBtn" disabled>عکس</button>
+    <button class="btn" id="moreBtn">تنظیمات</button>
+    <input id="tattooIn" type="file" accept="image/*">
+  </div>
+</div>
+
+<div id="cropOv">
+  <canvas id="cropCv"></canvas>
+  <div class="row">
+    <button class="btn primary" id="cropOk">تایید برش</button>
+    <button class="btn" id="cropFull">کل تصویر</button>
+    <button class="btn" id="cropCancel">لغو</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const hint = $('hint'), statusEl = $('status');
+const video = document.createElement('video');
+video.playsInline = true; video.muted = true; video.setAttribute('playsinline', '');
+
+let stream = null, facing = 'environment', running = false, mirror = false;
+let origSrc = null, tattooSrc = null, ink = null, blackInk = false, flipInk = false, inkVer = 0;
+let opV = 0.85, skinL = 0.6, frame = 0;
+// مقدارهای هدف (از انگشت) و مقدارهای نمایشی (نرم‌شده)
+let tx = null, ty = null, sc = 1, rot = 0, lastW = 0, lastH = 0;
+let dtx = null, dty = 0, dsc = 1, drot = 0, lastT = 0;
+
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._h); t._h = setTimeout(() => { t.style.display = 'none'; }, 4500);
+}
+let lastStatus = '';
+function setStatus(msg){
+  if(msg === lastStatus) return;
+  lastStatus = msg;
+  if(!msg){ statusEl.style.display = 'none'; return; }
+  statusEl.textContent = msg; statusEl.style.display = 'block';
+}
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t*t*(3 - 2*t); };
+
+// ---------- ساخت جوهر از طرح ----------
+// حالت رنگی: رنگ‌های اصلی دقیقاً حفظ می‌شود؛ فقط زمینه‌ی کاغذ حذف می‌شود
+//            (رنگ واقعیِ هر پیکسل از زمینه جدا می‌شود تا هاله‌ی خاکستری نماند).
+// حالت سیاه‌وسفید: طرح خاکستری/مشکی می‌شود و سایه‌روشنش حفظ می‌شود.
+const COLS = 40, ROWS = 12;
+let inkGrid = null;     // کدام سلول‌های مش واقعاً جوهر دارند (برای سرعت)
+
+function buildInk(){
+  if(!tattooSrc) return;
+  const k = Math.min(1, 2048 / Math.max(tattooSrc.width, tattooSrc.height));
+  const w = Math.max(1, Math.round(tattooSrc.width*k)), h = Math.max(1, Math.round(tattooSrc.height*k));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const cx = c.getContext('2d', {willReadFrequently:true}); cx.drawImage(tattooSrc, 0, 0, w, h);
+  const d = cx.getImageData(0, 0, w, h), p = d.data;
+
+  // آیا خود فایل زمینه‌ی شفاف دارد؟
+  let tr = 0, tot = 0;
+  for(let i = 3; i < p.length; i += 16){ tot++; if(p[i] < 250) tr++; }
+  const hasAlpha = tr/Math.max(1, tot) > 0.02;
+
+  // روشنایی کاغذ از لبه‌ی تصویر حدس زده می‌شود
+  const hist = new Array(256).fill(0); let cnt = 0;
+  const bw = Math.max(2, Math.round(Math.min(w, h)*0.03));
+  for(let y = 0; y < h; y++){
+    const edgeRow = y < bw || y >= h-bw;
+    for(let x = 0; x < w; x++){
+      if(!edgeRow && x >= bw && x < w-bw){ x = w-bw-1; continue; }
+      const q = (y*w + x)*4;
+      if(p[q+3] > 200){ hist[Math.round(0.299*p[q] + 0.587*p[q+1] + 0.114*p[q+2])]++; cnt++; }
+    }
+  }
+  let bg = 255;
+  if(cnt > 20){ let acc = 0; for(let m = 0; m < 256; m++){ acc += hist[m]; if(acc >= cnt/2){ bg = m; break; } } if(bg < 140) bg = 255; }
+  const cut = 0.12;
+  const shape = a0 => Math.pow(clamp((a0 - cut)/(1 - cut), 0, 1), 0.85);
+
+  for(let i = 0; i < p.length; i += 4){
+    const r = p[i], g = p[i+1], b = p[i+2];
+    if(blackInk){
+      const lum = 0.299*r + 0.587*g + 0.114*b;
+      const gray = Math.round(clamp(lum*0.5, 6, 70));
+      p[i] = gray; p[i+1] = gray; p[i+2] = gray;
+      if(!hasAlpha){
+        const dk = clamp((bg - lum)/bg, 0, 1);
+        p[i+3] = Math.round(p[i+3] * shape(dk));
+      }
+    } else if(!hasAlpha){
+      const m = Math.min(r, g, b);
+      const a0 = clamp((bg - m)/bg, 0, 1);
+      if(a0 > 0.004){
+        const inv = 1 / a0, base = bg*(1 - a0);
+        p[i]   = clamp((r - base)*inv, 0, 255);
+        p[i+1] = clamp((g - base)*inv, 0, 255);
+        p[i+2] = clamp((b - base)*inv, 0, 255);
+      }
+      p[i+3] = Math.round(p[i+3] * shape(a0));
+    }
+  }
+  cx.putImageData(d, 0, 0);
+
+  // نقشه‌ی سلول‌های دارای جوهر
+  const grid = new Uint8Array(COLS*ROWS);
+  for(let y = 0; y < h; y++){
+    const cy = Math.min(ROWS-1, Math.floor(y*ROWS/h)) * COLS;
+    for(let x = 0; x < w; x++){
+      if(p[(y*w + x)*4 + 3] > 10){ let col = Math.min(COLS-1, Math.floor(x*COLS/w)); if(flipInk) col = COLS-1-col; grid[cy + col] = 1; }
+    }
+  }
+  inkGrid = grid;
+  if(flipInk){
+    const f = document.createElement('canvas'); f.width = w; f.height = h;
+    const fx = f.getContext('2d'); fx.translate(w, 0); fx.scale(-1, 1); fx.drawImage(c, 0, 0);
+    ink = f;
+  } else ink = c;
+  inkVer++;
+}
+
+// ---------- ورودی طرح ----------
+$('tattooIn').addEventListener('change', e => {
+  const f = e.target.files[0]; if(!f) return;
+  const img = new Image(), u = URL.createObjectURL(f);
+  img.onload = () => {
+    URL.revokeObjectURL(u);
+    origSrc = img; tattooSrc = img; buildInk();
+    tx = null; sc = 1; rot = 0;
+    $('cropBtn').disabled = false;
+    toast('طرح آماده شد.');
+    if(!running) hint.textContent = 'طرح آماده است؛ «شروع دوربین» را بزن.';
+  };
+  img.onerror = () => { URL.revokeObjectURL(u); toast('این فایل باز نشد. یک عکس JPG یا PNG انتخاب کن.'); };
+  img.src = u;
+});
+$('sOp').oninput = e => { opV = +e.target.value / 100; };
+$('flipBtn').onclick = e => { flipInk = !flipInk; e.currentTarget.classList.toggle('on', flipInk); buildInk(); };
+$('resetBtn').onclick = () => { tx = null; sc = 1; rot = 0; };
+$('blackBtn').onclick = e => { blackInk = !blackInk; e.currentTarget.classList.toggle('on', blackInk); buildInk(); };
+
+// ---------- برش طرح ----------
+const cropOv = $('cropOv'), cropCv = $('cropCv'), cctx = cropCv.getContext('2d');
+let cr = null, cds = 1, cmode = null, cstart = null;
+const MINC = 30;
+function cropDraw(){
+  const W = cropCv.width, H = cropCv.height;
+  cctx.clearRect(0, 0, W, H);
+  cctx.drawImage(origSrc, 0, 0, W, H);
+  const x = cr.x*cds, y = cr.y*cds, w = cr.w*cds, h = cr.h*cds;
+  cctx.fillStyle = 'rgba(0,0,0,.6)';
+  cctx.fillRect(0, 0, W, y); cctx.fillRect(0, y+h, W, H-y-h);
+  cctx.fillRect(0, y, x, h); cctx.fillRect(x+w, y, W-x-w, h);
+  cctx.strokeStyle = '#E50914'; cctx.lineWidth = 2; cctx.strokeRect(x, y, w, h);
+  cctx.fillStyle = '#E50914';
+  [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].forEach(q => { cctx.beginPath(); cctx.arc(q[0], q[1], 11, 0, 6.283); cctx.fill(); });
+}
+function openCrop(){
+  if(!origSrc) return;
+  const maxW = window.innerWidth - 24, maxH = window.innerHeight - 140;
+  cds = Math.min(maxW / origSrc.width, maxH / origSrc.height);
+  cropCv.width = Math.round(origSrc.width*cds); cropCv.height = Math.round(origSrc.height*cds);
+  cropCv.style.width = cropCv.width + 'px'; cropCv.style.height = cropCv.height + 'px';
+  cr = {x: 0, y: 0, w: origSrc.width, h: origSrc.height};
+  cropOv.style.display = 'flex';
+  cropDraw();
+}
+function cropPos(e){
+  const r = cropCv.getBoundingClientRect();
+  return {x: (e.clientX - r.left) / cds, y: (e.clientY - r.top) / cds};
+}
+cropCv.addEventListener('pointerdown', e => {
+  const p = cropPos(e), tol = 30 / cds;
+  const cs = {tl:[cr.x, cr.y], tr:[cr.x+cr.w, cr.y], bl:[cr.x, cr.y+cr.h], br:[cr.x+cr.w, cr.y+cr.h]};
+  cmode = null;
+  for(const k in cs){ if(Math.hypot(p.x - cs[k][0], p.y - cs[k][1]) < tol){ cmode = k; break; } }
+  if(!cmode && p.x > cr.x && p.x < cr.x+cr.w && p.y > cr.y && p.y < cr.y+cr.h) cmode = 'move';
+  if(!cmode) return;
+  cstart = {p, r: {...cr}};
+  cropCv.setPointerCapture(e.pointerId);
+});
+cropCv.addEventListener('pointermove', e => {
+  if(!cmode) return;
+  const p = cropPos(e), dx = p.x - cstart.p.x, dy = p.y - cstart.p.y, s = cstart.r;
+  const IW = origSrc.width, IH = origSrc.height, mn = MINC / cds;
+  if(cmode === 'move'){
+    cr.x = clamp(s.x + dx, 0, IW - s.w); cr.y = clamp(s.y + dy, 0, IH - s.h);
+  } else {
+    let x1 = s.x, y1 = s.y, x2 = s.x + s.w, y2 = s.y + s.h;
+    if(cmode[1] === 'l') x1 = clamp(s.x + dx, 0, x2 - mn); else x2 = clamp(s.x + s.w + dx, x1 + mn, IW);
+    if(cmode[0] === 't') y1 = clamp(s.y + dy, 0, y2 - mn); else y2 = clamp(s.y + s.h + dy, y1 + mn, IH);
+    cr = {x: x1, y: y1, w: x2 - x1, h: y2 - y1};
+  }
+  cropDraw();
+});
+const endCrop = () => { cmode = null; };
+cropCv.addEventListener('pointerup', endCrop); cropCv.addEventListener('pointercancel', endCrop);
+$('cropBtn').onclick = openCrop;
+$('cropCancel').onclick = () => { cropOv.style.display = 'none'; };
+$('cropFull').onclick = () => { cr = {x: 0, y: 0, w: origSrc.width, h: origSrc.height}; cropDraw(); };
+$('cropOk').onclick = () => {
+  const k = Math.min(1, 1600 / Math.max(cr.w, cr.h));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(cr.w*k)); c.height = Math.max(1, Math.round(cr.h*k));
+  c.getContext('2d').drawImage(origSrc, cr.x, cr.y, cr.w, cr.h, 0, 0, c.width, c.height);
+  tattooSrc = c; buildInk();
+  cropOv.style.display = 'none';
+  toast('برش انجام شد.');
+};
+
+// ---------- دوربین ----------
+const CAM_W = 1920, CAM_H = 1440;   // اگر روی گوشی ضعیف کند شد: 1600 و 1200
+async function openCamera(){
+  if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+  // رزولوشن بالا و نسبت 4:3 (کل سنسور)، همیشه به‌صورت «عرض > ارتفاع».
+  // قبلاً در حالت عمودی 720×1280 خواسته می‌شد؛ مرورگر آن را از تصویر افقی «برش» می‌زد
+  // و نتیجه زوم‌شده و کم‌کیفیت بود. حالا مرورگر خودش تصویر را می‌چرخاند و کل کادر را نگه می‌دارد.
+  const base = {facingMode: {ideal: facing}};
+  try{
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: Object.assign({}, base, {width: {ideal: CAM_W}, height: {ideal: CAM_H}, frameRate: {ideal: 30}}), audio: false
+      });
+    } catch(e1){
+      stream = await navigator.mediaDevices.getUserMedia({video: base, audio: false});
+    }
+  } catch(err){
+    toast('دوربین باز نشد. اجازه‌ی دوربین را بده و مطمئن شو صفحه با HTTPS باز شده است.');
+    return false;
+  }
+  video.srcObject = stream;
+  await video.play();
+  const tr = stream.getVideoTracks()[0];
+  // اگر دوربین زوم دارد، روی کمترین مقدار (زاویه‌ی کامل) بگذار تا تصویر زوم نشود
+  try{
+    const zc = tr.getCapabilities ? tr.getCapabilities() : {};
+    if(zc.zoom && typeof zc.zoom.min === 'number') await tr.applyConstraints({advanced: [{zoom: zc.zoom.min}]});
+  } catch(_){}
+  const s = tr.getSettings ? tr.getSettings() : {};
+  mirror = (s.facingMode || facing) === 'user';
+  cv.classList.toggle('mirror', mirror);
+  tx = null; skinReady = false; eL = null; eR = null; wKey = '';
+  // فلش (چراغ قوه): فقط وقتی دوربین پشتی آن را پشتیبانی کند فعال می‌شود
+  torchOn = false; torchTrack = tr;
+  const caps = tr.getCapabilities ? tr.getCapabilities() : {};
+  torchOk = !!caps.torch;
+  $('torchBtn').disabled = !torchOk;
+  $('torchBtn').classList.remove('on');
+  return true;
+}
+let torchOn = false, torchOk = false, torchTrack = null;
+$('torchBtn').onclick = async () => {
+  if(!torchOk || !torchTrack){ toast('این دوربین فلش را پشتیبانی نمی‌کند.'); return; }
+  try{
+    await torchTrack.applyConstraints({advanced: [{torch: !torchOn}]});
+    torchOn = !torchOn;
+    $('torchBtn').classList.toggle('on', torchOn);
+  } catch(_){ toast('روشن کردن فلش ممکن نشد.'); }
+};
+$('startBtn').onclick = async () => {
+  $('startBtn').disabled = true;
+  const ok = await openCamera();
+  $('startBtn').disabled = false;
+  if(!ok) return;
+  hint.style.display = 'none';
+  $('camBtn').disabled = false; $('snapBtn').disabled = false;
+  $('startBtn').style.display = 'none';
+  lockScreen();
+  if(!running){ running = true; requestAnimationFrame(loop); }
+};
+let wake = null;
+async function lockScreen(){ try{ if('wakeLock' in navigator) wake = await navigator.wakeLock.request('screen'); }catch(_){} }
+document.addEventListener('visibilitychange', async () => {
+  if(document.hidden){ if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } }
+  else if(running && !stream){ if(await openCamera()) lockScreen(); }
+});
+$('camBtn').onclick = async () => { facing = facing === 'environment' ? 'user' : 'environment'; await openCamera(); };
+
+// ---------- جابه‌جایی، بزرگ/کوچک و چرخاندن با انگشت ----------
+// ---------- مرحله ۲: فیلتر ضدلرزش (One Euro) ----------
+// آهسته حرکت دادن = خیلی نرم و بدون لرزش؛ تند حرکت دادن = بدون تأخیر.
+const fX = {}, fY = {}, fS = {}, fR = {};
+function euroReset(){ for(const f of [fX, fY, fS, fR]){ f.x = null; } }
+function euro(f, v, dt, minC, beta){
+  const lp = (a, prev, x) => prev + a*(x - prev);
+  const al = c => 1 / (1 + (1/(2*Math.PI*c))/dt);
+  if(f.x == null){ f.x = v; f.raw = v; f.dx = 0; return v; }
+  const d = (v - f.raw)/dt; f.raw = v;
+  f.dx = lp(al(1), f.dx, d);
+  f.x = lp(al(minC + beta*Math.abs(f.dx)), f.x, v);
+  return f.x;
+}
+const ptrs = new Map(); let g = null;
+function toCv(e){
+  const r = cv.getBoundingClientRect();
+  let px = e.clientX - r.left;
+  const py = e.clientY - r.top;
+  if(mirror) px = r.width - px;
+  const k = Math.max(r.width / cv.width, r.height / cv.height);
+  const ox = (r.width - cv.width*k)/2, oy = (r.height - cv.height*k)/2;
+  return {x: (px - ox)/k, y: (py - oy)/k};
+}
+function startGesture(){
+  const a = [...ptrs.values()];
+  if(!a.length){ g = null; return; }
+  g = {tx, ty, sc, rot};
+  if(a.length === 1) g.p0 = a[0];
+  else {
+    g.d0 = Math.hypot(a[1].x - a[0].x, a[1].y - a[0].y) || 1;
+    g.a0 = Math.atan2(a[1].y - a[0].y, a[1].x - a[0].x);
+    g.m0 = {x: (a[0].x + a[1].x)/2, y: (a[0].y + a[1].y)/2};
+  }
+}
+cv.addEventListener('pointerdown', e => {
+  if(!ink || tx == null) return;
+  cv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, toCv(e));
+  startGesture();
+});
+cv.addEventListener('pointermove', e => {
+  if(!ptrs.has(e.pointerId) || !g) return;
+  ptrs.set(e.pointerId, toCv(e));
+  const a = [...ptrs.values()];
+  if(a.length === 1 && g.p0){
+    tx = g.tx + (a[0].x - g.p0.x); ty = g.ty + (a[0].y - g.p0.y);
+  } else if(a.length >= 2 && g.d0){
+    const d = Math.hypot(a[1].x - a[0].x, a[1].y - a[0].y) || 1;
+    const ang = Math.atan2(a[1].y - a[0].y, a[1].x - a[0].x);
+    const m = {x: (a[0].x + a[1].x)/2, y: (a[0].y + a[1].y)/2};
+    sc = clamp(g.sc * d / g.d0, 0.1, 8);
+    rot = g.rot + Math.atan2(Math.sin(ang - g.a0), Math.cos(ang - g.a0));
+    tx = g.tx + (m.x - g.m0.x); ty = g.ty + (m.y - g.m0.y);
+  }
+});
+const upPtr = e => { ptrs.delete(e.pointerId); startGesture(); };
+cv.addEventListener('pointerup', upPtr); cv.addEventListener('pointercancel', upPtr);
+cv.addEventListener('wheel', e => { e.preventDefault(); sc = clamp(sc * Math.exp(-e.deltaY * 0.001), 0.1, 8); }, {passive:false});
+
+// ---------- تشخیص پوست (رنگ، در YCbCr) و لبه‌ی عضو ----------
+const MW = 192;
+const lowCv = document.createElement('canvas'), lowCtx = lowCv.getContext('2d', {willReadFrequently:true});
+const maskCv = document.createElement('canvas'), maskCtx = maskCv.getContext('2d');
+const tcv = document.createElement('canvas'), tcx = tcv.getContext('2d');
+const wcv = document.createElement('canvas'), wcx = wcv.getContext('2d');
+let wKey = '';
+let mask = null, maskF = null, blurB = null, mw = 0, mh = 0;
+let skinReady = false, noSkin = false, skTick = 0, eL = null, eR = null;
+
+function updateSkin(p){
+  if(skinReady && (skTick++ % 3) !== 0) return;
+  const cw = cv.width, ch = cv.height;
+  const W = MW, H = Math.max(8, Math.round(MW*ch/cw));
+  if(lowCv.width !== W || lowCv.height !== H){
+    lowCv.width = W; lowCv.height = H; maskCv.width = W; maskCv.height = H;
+    mask = new Uint8Array(W*H); maskF = new Float32Array(W*H); blurB = new Float32Array(W*H);
+    mw = W; mh = H; skinReady = false;
+  }
+  lowCtx.drawImage(cv, 0, 0, W, H);
+  const d = lowCtx.getImageData(0, 0, W, H).data;
+  const px = clamp(Math.round(p.x*W/cw), 3, W-4), py = clamp(Math.round(p.y*H/ch), 3, H-4);
+  const ycc = i => {
+    const r = d[i], g2 = d[i+1], b = d[i+2];
+    return [0.299*r + 0.587*g2 + 0.114*b, 128 - 0.168736*r - 0.331264*g2 + 0.5*b, 128 + 0.5*r - 0.418688*g2 - 0.081312*b];
+  };
+  let sY = 0, sCb = 0, sCr = 0, n = 0;
+  for(let dy = -3; dy <= 3; dy++) for(let dx = -3; dx <= 3; dx++){
+    const c = ycc(((py+dy)*W + px + dx)*4); sY += c[0]; sCb += c[1]; sCr += c[2]; n++;
+  }
+  const Y0 = sY/n, Cb0 = sCb/n, Cr0 = sCr/n;
+  skinL = skinL*0.6 + (Y0/255)*0.4;                       // روشنایی پوست زیر طرح
+  const gate = (cb, cr) => cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173;
+  // اگر نقطه‌ی مرجع شبیه پوست بود (حتی در نور رنگی)، پوست را نسبت به همان نقطه تشخیص بده
+  const refLoose = Cb0 >= 72 && Cb0 <= 134 && Cr0 >= 130 && Cr0 <= 182 && Y0 > 25;
+  const raw = new Uint8Array(W*H);
+  for(let k = 0, q = 0; k < W*H; k++, q += 4){
+    const r = d[q], g2 = d[q+1], b = d[q+2];
+    const yy = 0.299*r + 0.587*g2 + 0.114*b;
+    const cb = 128 - 0.168736*r - 0.331264*g2 + 0.5*b;
+    const cr = 128 + 0.5*r - 0.418688*g2 - 0.081312*b;
+    const ok = refLoose ? (Math.abs(cb-Cb0) < 15 && Math.abs(cr-Cr0) < 15 && Math.abs(yy-Y0) < 80 && yy > 20) : gate(cb, cr);
+    raw[k] = ok ? 1 : 0;
+  }
+  for(let y = 1; y < H-1; y++) for(let x = 1; x < W-1; x++){      // حذف نقطه‌های پراکنده
+    let c = 0;
+    for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) c += raw[(y+dy)*W + x + dx];
+    mask[y*W + x] = c >= 5 ? 1 : 0;
+  }
+  // لبه‌ی نرم: محو کردن + منحنی + میانگین زمانی (بدون لرزش)
+  for(let y = 1; y < H-1; y++) for(let x = 1; x < W-1; x++){
+    let c = 0;
+    for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) c += mask[(y+dy)*W + x + dx];
+    blurB[y*W + x] = c / 9;
+  }
+  const img = maskCtx.createImageData(W, H);
+  const first = !skinReady;
+  for(let k = 0; k < W*H; k++){
+    const on = !first && maskF[k] > 0.5;                       // هیسترزیس: پیکسلِ روشن راحت خاموش نمی‌شود
+    const v = on ? smooth(0.2, 0.7, blurB[k]) : smooth(0.38, 0.9, blurB[k]);
+    maskF[k] = first ? v : maskF[k]*0.55 + v*0.45;
+    img.data[k*4+3] = Math.round(maskF[k]*255);
+  }
+  maskCtx.putImageData(img, 0, 0);
+  let cnt = 0, tot = 0;
+  for(let dy = -7; dy <= 7; dy++) for(let dx = -7; dx <= 7; dx++){
+    const x = px+dx, y = py+dy;
+    if(x >= 0 && x < W && y >= 0 && y < H){ cnt += mask[y*W + x]; tot++; }
+  }
+  noSkin = cnt/Math.max(1, tot) < 0.3;
+  skinReady = true;
+}
+
+// فاصله‌ی مرکز طرح تا لبه‌ی پوست در دو سمت (در راستای عرض طرح)
+function edgesAt(p, ang){
+  if(!skinReady || noSkin) return null;
+  const k = mw / cv.width, nx = Math.cos(ang), ny = Math.sin(ang);
+  const maxT = mw * 0.35;
+  function march(sign){
+    let miss = 0, last = 0;
+    for(let t = 0; t < maxT; t += 0.5){
+      const x = Math.round(p.x*k + sign*nx*t), y = Math.round(p.y*k + sign*ny*t);
+      const inside = x >= 0 && x < mw && y >= 0 && y < mh;
+      if(inside && mask[y*mw + x]){ miss = 0; last = t; }
+      else if(++miss >= 3) break;
+    }
+    return last / k;
+  }
+  const hl = march(-1), hr = march(1);
+  if(hl + hr < p.W * 0.25) return null;
+  eL = eL == null ? hl : eL*0.75 + hl*0.25; eR = eR == null ? hr : eR*0.75 + hr*0.25;
+  return {hl: eL, hr: eR};
+}
+
+// ---------- پیچیدن طرح دور عضو (استوانه) ----------
+// طول کمان حفظ می‌شود (جزئیات طرح کشیده نمی‌شود)، بخشی که از لبه‌ی عضو
+// به پشت می‌رود بریده می‌شود، و محو شدن نرم کنار لبه با یک گرادیان انجام می‌شود.
+function drawWrapped(t, Wt, Ht, R, c0){
+  const lim = Math.PI/2 - 0.03;
+  const span = clamp(Wt / R, 0.05, Math.PI*1.9);                 // زاویه‌ای که طرح اشغال می‌کند
+  const thC = Math.asin(clamp(-c0 / R, -0.94, 0.94));            // زاویه‌ی مرکز طرح روی استوانه
+  const cs0 = Math.cos(thC);
+  const yBend = Math.min(Ht * 0.14, Math.max(2, R * 0.07));
+  const persp = Math.min(0.2, Math.max(0.03, Ht / Math.max(Wt, 1) * 0.16));
+  const k0 = 1 / (1 - persp*(1 - cs0));
+  const thAt = u => clamp(thC + span*(u - 0.5), -lim, lim);
+
+  // نقاط مش
+  const P = [];
+  for(let j = 0; j <= ROWS; j++){
+    const v = j/ROWS, row = [];
+    for(let i = 0; i <= COLS; i++){
+      const th = thAt(i/COLS), cs = Math.cos(th);
+      row.push({
+        x: c0 + R*Math.sin(th),
+        y: (v - 0.5)*Ht*(1 - persp*(1 - cs))*k0 + (cs - cs0)*yBend
+      });
+    }
+    P.push(row);
+  }
+
+  const sw = ink.width / COLS, sh = ink.height / ROWS;
+  t.save();
+  t.imageSmoothingEnabled = true; t.imageSmoothingQuality = 'high';
+
+  function tri(x0,y0,x1,y1,x2,y2, tx0,ty0,tx1,ty1,tx2,ty2, sx,sy,sw0,sh0){
+    if(Math.abs((x1-x0)*(y2-y0) - (x2-x0)*(y1-y0)) < 0.04) return;      // مثلث تباه‌شده
+    const det = tx0*(ty1-ty2)+tx1*(ty2-ty0)+tx2*(ty0-ty1);
+    if(Math.abs(det) < 1e-6) return;
+    const aa = (x0*(ty1-ty2)+x1*(ty2-ty0)+x2*(ty0-ty1))/det;
+    const cc = (x0*(tx2-tx1)+x1*(tx0-tx2)+x2*(tx1-tx0))/det;
+    const ee = (x0*(tx1*ty2-tx2*ty1)+x1*(tx2*ty0-tx0*ty2)+x2*(tx0*ty1-tx1*ty0))/det;
+    const bb = (y0*(ty1-ty2)+y1*(ty2-ty0)+y2*(ty0-ty1))/det;
+    const dd = (y0*(tx2-tx1)+y1*(tx0-tx2)+y2*(tx1-tx0))/det;
+    const ff = (y0*(tx1*ty2-tx2*ty1)+y1*(tx2*ty0-tx0*ty2)+y2*(tx0*ty1-tx1*ty0))/det;
+    // مثلث را کمی بزرگ می‌کنیم تا بین سلول‌ها درز دیده نشود
+    const gx = (x0+x1+x2)/3, gy = (y0+y1+y2)/3, gr = 0.35;
+    const grow = (x, y) => { const dx = x-gx, dy = y-gy, l = Math.hypot(dx, dy) || 1; return [x + dx/l*gr, y + dy/l*gr]; };
+    const q0 = grow(x0,y0), q1 = grow(x1,y1), q2 = grow(x2,y2);
+    t.save();
+    t.beginPath(); t.moveTo(q0[0],q0[1]); t.lineTo(q1[0],q1[1]); t.lineTo(q2[0],q2[1]); t.closePath(); t.clip();
+    t.transform(aa,bb,cc,dd,ee,ff);                                    // transform نه setTransform: جابه‌جایی و چرخش حفظ می‌شود
+    const rx = Math.max(0, sx-1), ry = Math.max(0, sy-1);
+    const rw = Math.min(ink.width, sx+sw0+1) - rx, rh = Math.min(ink.height, sy+sh0+1) - ry;
+    t.drawImage(ink, rx, ry, rw, rh, rx, ry, rw, rh);
+    t.restore();
+  }
+
+  for(let j = 0; j < ROWS; j++){
+    for(let i = 0; i < COLS; i++){
+      if(inkGrid && !inkGrid[j*COLS + i]) continue;
+      const a = P[j][i], b = P[j][i+1], c = P[j+1][i], d = P[j+1][i+1];
+      const sx = i*sw, sy = j*sh;
+      tri(a.x,a.y,b.x,b.y,c.x,c.y, sx,sy, sx+sw,sy, sx,sy+sh, sx,sy,sw,sh);
+      tri(b.x,b.y,d.x,d.y,c.x,c.y, sx+sw,sy, sx+sw,sy+sh, sx,sy+sh, sx,sy,sw,sh);
+    }
+  }
+
+  // محو شدن نرم به سمت لبه‌ی عضو (فقط شفافیت؛ رنگ جوهر دست نمی‌خورد)
+  const xa = c0 + R*Math.sin(thAt(0)), xb = c0 + R*Math.sin(thAt(1));
+  if(xb - xa > 2){
+    const gr = t.createLinearGradient(xa, 0, xb, 0);
+    for(let q = 0; q <= 24; q++){
+      const th = thAt(q/24), x = c0 + R*Math.sin(th);
+      const off = clamp((x - xa)/(xb - xa), 0, 1);
+      const a = 0.2 + 0.8*Math.pow(Math.cos(th), 0.4);
+      gr.addColorStop(off, 'rgba(0,0,0,' + a.toFixed(3) + ')');
+    }
+    t.globalCompositeOperation = 'destination-in';
+    t.fillStyle = gr;
+    t.fillRect(-6000, -6000, 12000, 12000);
+    t.globalCompositeOperation = 'source-over';
+  }
+  t.restore();
+}
+
+const hasFilter = 'filter' in ctx;
+
+// ---------- مرحله ۱: جوهر «زیر پوست» ----------
+// بافت و سایه‌روشنِ خودِ پوست (منفذها، چین‌ها، برجستگی) از تصویر دوربین جدا می‌شود
+// و روی جوهر برگردانده می‌شود تا طرح مثل استیکر صاف نباشد.
+const hcv = document.createElement('canvas'), hcx = hcv.getContext('2d');
+const kcv = document.createElement('canvas'), kcx = kcv.getContext('2d');
+function skinTexture(){
+  const w = Math.max(2, cv.width >> 1), h = Math.max(2, cv.height >> 1);
+  if(hcv.width !== w || hcv.height !== h){ hcv.width = w; hcv.height = h; }
+  hcx.setTransform(1, 0, 0, 1, 0, 0); hcx.globalCompositeOperation = 'source-over';
+  hcx.filter = 'none'; hcx.globalAlpha = 1;
+  hcx.drawImage(cv, 0, 0, w, h);                                   // خود پوست
+  hcx.filter = 'invert(1) blur(' + (w/70).toFixed(1) + 'px)';      // معکوسِ نسخه‌ی تار
+  hcx.globalAlpha = 0.5; hcx.drawImage(cv, 0, 0, w, h);            // = خاکستریِ میانی + جزئیات (high-pass)
+  hcx.filter = 'none'; hcx.globalAlpha = 1;
+}
+
+function drawTattoo(p){
+  updateSkin(p);
+  const tD = clamp((0.55 - skinL)/0.35, 0, 1);
+  const bw = blackInk;
+  // حالت رنگی: رنگ طرح دقیقاً همان است (فقط شفافیت)؛ حالت سیاه‌وسفید: روی پوست تیره غلیظ‌تر
+  const alpha = bw ? clamp(opV * (1 + 0.45*tD), 0, 1) : opV;
+  const s = (p.W * 1.6) / Math.max(ink.width, ink.height);
+  const Wt = ink.width*s, Ht = ink.height*s;
+  const useClip = skinReady && !noSkin;
+  setStatus(skinReady && noSkin ? 'پوستی زیر طرح پیدا نشد؛ طرح بدون برش نشان داده می‌شود. عضو را زیر طرح ببر یا نور را بهتر کن.' : '');
+
+  if(tcv.width !== cv.width || tcv.height !== cv.height){ tcv.width = cv.width; tcv.height = cv.height; }
+  tcx.setTransform(1, 0, 0, 1, 0, 0); tcx.globalCompositeOperation = 'source-over'; tcx.globalAlpha = 1;
+  tcx.clearRect(0, 0, tcv.width, tcv.height);
+
+  if(wcv.width !== cv.width || wcv.height !== cv.height){ wcv.width = cv.width; wcv.height = cv.height; wKey = ''; }
+  let R, c0;
+  const e = edgesAt(p, p.a);
+  if(e){ R = (e.hl + e.hr)/2; c0 = (e.hr - e.hl)/2; } else { R = p.W * 0.55; c0 = 0; }
+  const key = [inkVer, Math.round(p.x*2), Math.round(p.y*2), Math.round(p.a*500), Math.round(Wt), Math.round(R*2), Math.round(c0*2)].join('|');
+  if(key !== wKey){
+    wKey = key;
+    wcx.setTransform(1, 0, 0, 1, 0, 0); wcx.clearRect(0, 0, wcv.width, wcv.height);
+    wcx.save(); wcx.translate(p.x, p.y); wcx.rotate(p.a);
+    if(R > 4) drawWrapped(wcx, Wt, Ht, R, c0);
+    else wcx.drawImage(ink, -Wt/2, -Ht/2, Wt, Ht);
+    wcx.restore();
+  }
+  tcx.drawImage(wcv, 0, 0);
+
+  if(useClip){                                                    // فقط روی پوست
+    tcx.setTransform(1, 0, 0, 1, 0, 0); tcx.globalAlpha = 1; tcx.globalCompositeOperation = 'destination-in';
+    tcx.imageSmoothingEnabled = true; tcx.imageSmoothingQuality = 'high';
+    if(hasFilter) tcx.filter = 'blur(' + Math.max(0.8, Math.min(cv.width, cv.height)/450).toFixed(1) + 'px)';   // لبه‌ی نرم و بدون دندانه
+    tcx.drawImage(maskCv, 0, 0, tcv.width, tcv.height);
+    tcx.filter = 'none';
+    tcx.globalCompositeOperation = 'source-over';
+  }
+
+  // جوهر مشکی زیر پوست کمی مایل به آبی‌خاکستری دیده می‌شود
+  if(bw){
+    tcx.globalCompositeOperation = 'source-atop'; tcx.globalAlpha = 0.22;
+    tcx.fillStyle = 'rgb(48,66,92)'; tcx.fillRect(0, 0, tcv.width, tcv.height);
+    tcx.globalAlpha = 1; tcx.globalCompositeOperation = 'source-over';
+  }
+  const doTex = hasFilter;
+  if(doTex) skinTexture();                       // قبل از کشیدن طرح، از پوستِ خالی
+
+  ctx.save();
+  ctx.globalCompositeOperation = bw ? 'multiply' : 'source-over';
+  ctx.globalAlpha = alpha;
+  if(hasFilter) ctx.filter = (bw ? '' : 'saturate(0.9) ') + 'blur(' + Math.max(0.3, Math.min(cv.width, cv.height)/2600).toFixed(2) + 'px)';   // نرمیِ جوهر زیر پوست
+  ctx.drawImage(tcv, 0, 0);
+  ctx.restore();
+
+  // بافت و سایه‌ی پوست روی خود جوهر
+  if(doTex){
+    if(kcv.width !== cv.width || kcv.height !== cv.height){ kcv.width = cv.width; kcv.height = cv.height; }
+    kcx.setTransform(1, 0, 0, 1, 0, 0); kcx.globalCompositeOperation = 'source-over'; kcx.globalAlpha = 1;
+    kcx.clearRect(0, 0, kcv.width, kcv.height);
+    kcx.imageSmoothingEnabled = true; kcx.imageSmoothingQuality = 'high';
+    kcx.drawImage(hcv, 0, 0, kcv.width, kcv.height);
+    kcx.globalCompositeOperation = 'destination-in'; kcx.drawImage(tcv, 0, 0);   // فقط جایی که جوهر هست
+    kcx.globalCompositeOperation = 'source-over';
+    ctx.save();
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.globalAlpha = clamp(alpha*0.75, 0, 0.7);
+    ctx.drawImage(kcv, 0, 0);
+    ctx.restore();
+  }
+}
+
+// ---------- حلقه‌ی اصلی ----------
+function loop(){
+  requestAnimationFrame(loop);
+  if(!stream || video.readyState < 2 || !video.videoWidth) return;
+  const cw = video.videoWidth, ch = video.videoHeight;
+  if(cv.width !== cw || cv.height !== ch){ cv.width = cw; cv.height = ch; }
+  if(tx == null || lastW !== cw || lastH !== ch){
+    tx = cw/2; ty = ch/2; lastW = cw; lastH = ch; dtx = null; eL = null; eR = null;
+  }
+  // حرکت نرم به سمت مقدار هدف
+  const nowT = performance.now();
+  if(dtx == null){ dtx = tx; dty = ty; dsc = sc; drot = rot; euroReset(); lastT = nowT; }
+  else {
+    const dt = Math.min(0.1, Math.max(0.004, (nowT - lastT)/1000)); lastT = nowT;
+    const u = 1000 / Math.min(cw, ch);                       // مستقل از رزولوشن
+    dtx = euro(fX, tx*u, dt, 2.0, 0.015) / u;
+    dty = euro(fY, ty*u, dt, 2.0, 0.015) / u;
+    dsc = Math.exp(euro(fS, Math.log(sc), dt, 2.0, 2.5));
+    drot = euro(fR, rot, dt, 2.0, 1.2);
+  }
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  ctx.drawImage(video, 0, 0, cw, ch);
+  if(!ink) return;
+  const p = {x: dtx, y: dty, W: Math.min(cw, ch) * 0.25 * dsc, a: drot};
+  drawTattoo(p);
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+}
+
+$('moreBtn').onclick = () => { const o = $('sheet').classList.toggle('open'); $('moreBtn').classList.toggle('on', o); };
+
+// ---------- ثبت عکس ----------
+$('snapBtn').onclick = () => {
+  cv.toBlob(b => {
+    if(!b){ toast('ساخت تصویر ناموفق بود؛ دوباره امتحان کن.'); return; }
+    const touch = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+    let file = null; try{ file = new File([b], 'inkoo-ar.png', {type:'image/png'}); }catch(_){}
+    const dl = () => {
+      const u = URL.createObjectURL(b), a = document.createElement('a');
+      a.href = u; a.download = 'inkoo-ar.png'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+    };
+    if(touch && file && navigator.canShare && navigator.share && navigator.canShare({files:[file]})){
+      navigator.share({files:[file], title:'INKOO'}).catch(err => { if(!err || err.name !== 'AbortError') dl(); });
+    } else dl();
+  }, 'image/png');
+};
+</script>
+</body>
+</html>
